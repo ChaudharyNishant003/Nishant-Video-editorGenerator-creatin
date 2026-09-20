@@ -1,0 +1,7 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+edge-tts>=6.1.10
+moviepy>=2.1.1
+pillow>=10.2
+numpy>=1.26
+requests>=2.31
