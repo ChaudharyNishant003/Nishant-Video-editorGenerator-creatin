@@ -40,7 +40,7 @@ That produces hooks + outline, a full script, a scene-by-scene breakdown, an ima
 | **Text / LLM** | Google Gemini, Groq | OpenRouter, Together AI | DeepSeek, OpenAI, Anthropic |
 | **Images** | Pollinations (no key) | Hugging Face (FLUX), Together (FLUX) | Stability AI, OpenAI |
 | **Video** | — | fal.ai, Replicate, Hugging Face, MiniMax (Hailuo) | Luma Dream Machine, Runway Gen-4, Google Veo |
-| **Voice / TTS** | Browser Web Speech, Edge-TTS* | ElevenLabs | OpenAI TTS |
+| **Voice / TTS** | Browser Web Speech, Edge-TTS* | ElevenLabs, Google Cloud TTS | OpenAI TTS |
 
 \* Edge-TTS needs the Phase-2 backend. All **Video** providers are credit-based (no reliable no-key option exists); the free/freemium ones give trial credits on signup.
 

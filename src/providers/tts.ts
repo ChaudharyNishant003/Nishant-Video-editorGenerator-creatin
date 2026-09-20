@@ -114,6 +114,41 @@ export const ttsProviders: Provider[] = [
     },
   },
   {
+    id: "google-tts",
+    name: "Google Cloud TTS",
+    kind: "tts",
+    tier: "freemium",
+    note: "Free monthly quota • separate Cloud API key from Gemini",
+    signupUrl: "https://console.cloud.google.com/apis/credentials",
+    secrets: [apiKeyField("AIza…")],
+    params: [
+      { key: "voice", label: "Voice", type: "text", default: "en-US-Neural2-F", placeholder: "en-US-Neural2-F" },
+    ],
+    async runTts(text, ctx) {
+      const apiKey = ctx.config.apiKey?.trim();
+      if (!apiKey) throw new Error("Missing Google Cloud TTS key — add it in Settings › API Keys.");
+      const voice = ctx.config.voice?.trim() || "en-US-Neural2-F";
+      const languageCode = voice.split("-").slice(0, 2).join("-") || "en-US";
+      const res = await fetch(`/api/gtts/v1/text:synthesize?key=${encodeURIComponent(apiKey)}`, {
+        method: "POST",
+        signal: ctx.signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          input: { text },
+          voice: { languageCode, name: voice },
+          audioConfig: { audioEncoding: "MP3" },
+        }),
+      });
+      const raw = await res.text();
+      if (!res.ok) throw new Error(`${res.status} — ${trim(raw)}`);
+      const data = JSON.parse(raw);
+      const b64 = data?.audioContent;
+      if (!b64) throw new Error(`No audio returned. Response: ${trim(raw)}`);
+      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      return { url: URL.createObjectURL(new Blob([bytes], { type: "audio/mpeg" })), playbackOnly: false };
+    },
+  },
+  {
     id: "openai-tts",
     name: "OpenAI TTS",
     kind: "tts",
