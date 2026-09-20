@@ -68,11 +68,11 @@ If it needs a new host, add a proxy line in `vite.config.ts`. That's it — it s
 
 ```
 src/
-  providers/     # the provider registry (llm / image / tts) — the free→paid menus
-  stages.ts      # the 6 pipeline stages + default editable prompts
+  providers/     # the provider registry (llm / image / video / tts) — the free→paid menus
+  stages.ts      # the 7 pipeline stages + default editable prompts
   engine.ts      # runs a stage / chains the whole pipeline
   store.ts       # state + localStorage persistence
-  components/    # Sidebar, InputsBar, StagePanel, Settings, AssemblePlayer
+  components/    # Sidebar, InputsBar, StagePanel, FieldEditor, Settings, AssemblePlayer, RenderExport
 vite.config.ts   # dev proxies (kills CORS) + /render slot for the Phase-2 backend
 ```
 
