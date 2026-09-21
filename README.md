@@ -80,7 +80,7 @@ vite.config.ts   # dev proxies (kills CORS) + /render slot for the Phase-2 backe
 
 A local **FastAPI** service (in [`backend/`](backend/)) exposed under `/render` that adds what the browser can't:
 - **Edge-TTS** narration — free, realistic Microsoft voices, downloadable audio (`/render/tts`, `/render/voices`)
-- **MoviePy / ffmpeg** stitching of the scene images + per-scene narration into a real **.mp4** with burned-in captions (`/render/video`)
+- **MoviePy / ffmpeg** stitching into a real **.mp4** with burned-in captions (`/render/video`): scenes with a generated **video clip** (stage 5) use that clip, resized/cropped to fill the frame and looped or trimmed to match narration length; scenes with only a still get a slow **Ken-Burns** zoom instead. Falls back to the still if a clip fails to download.
 
 ### Run the backend
 
@@ -93,5 +93,3 @@ uvicorn main:app --port 8000
 ```
 
 Then in the app: the **Voiceover** stage can use the **Edge-TTS** provider (downloadable audio), and the **Storyboard / Assemble** stage shows an **Export real .mp4** panel — click **Render .mp4** to get a finished video of your scenes timed to narration. The frontend reaches the backend through the Vite proxy (`/render`), so no CORS setup is needed. Edge-TTS needs an internet connection at render time.
-
-**Next backend enhancement:** stitch the generated **video clips** (stage 5) in place of stills, plus Ken-Burns motion on still scenes.

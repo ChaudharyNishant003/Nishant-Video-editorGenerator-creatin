@@ -4,9 +4,9 @@ import { IconVideo, IconDownload } from "../icons";
 
 type Backend = "checking" | "online" | "offline";
 
-// Turns a blob:/data: image into a data URI the backend can decode; remote URLs
-// are passed through unchanged (the backend fetches them server-side).
-async function resolveImage(url: string | undefined): Promise<string | null> {
+// Turns a blob:/data: image or video into a data URI the backend can decode;
+// remote URLs are passed through unchanged (the backend fetches them server-side).
+async function resolveMedia(url: string | undefined): Promise<string | null> {
   if (!url) return null;
   if (url.startsWith("http")) return url;
   if (url.startsWith("data:")) return url;
@@ -24,6 +24,7 @@ async function resolveImage(url: string | undefined): Promise<string | null> {
 export function RenderExport() {
   const scenes = useStore((s) => s.runtime["visuals"]?.scenes) || [];
   const images = useStore((s) => s.runtime["images"]?.images) || {};
+  const videos = useStore((s) => s.runtime["video"]?.videos) || {};
   const dimensions = useStore((s) => s.inputs.dimensions);
 
   const [backend, setBackend] = useState<Backend>("checking");
@@ -56,7 +57,8 @@ export function RenderExport() {
           scene: s.scene,
           narration: s.narration,
           onScreenText: s.onScreenText,
-          image: await resolveImage(images[s.scene]),
+          image: await resolveMedia(images[s.scene]),
+          video: await resolveMedia(videos[s.scene]),
         })),
       );
       const res = await fetch("/render/video", {
@@ -133,9 +135,9 @@ export function RenderExport() {
       )}
 
       <div className="notice" style={{ marginTop: 14 }}>
-        This renders each scene’s <b>image + burned-in caption</b>, timed to its <b>Edge-TTS narration</b>, into one
-        video. Stitching the generated <b>video clips</b> (stage 5) and Ken-Burns motion are the next backend
-        enhancement.
+        Scenes with a generated <b>video clip</b> (stage 5) use that clip, resized to fill the frame and
+        looped/trimmed to match the narration. Scenes with only a still get a slow <b>Ken-Burns</b> zoom instead.
+        Either way, the <b>caption</b> stays fixed on top, timed to <b>Edge-TTS narration</b>.
       </div>
     </div>
   );
