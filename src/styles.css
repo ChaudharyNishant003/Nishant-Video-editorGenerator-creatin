@@ -388,6 +388,21 @@ a:hover {
   background: var(--paid);
 }
 
+.save-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.save-success {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #0a2a17;
+  background: var(--free);
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
 .output {
   white-space: pre-wrap;
   line-height: 1.6;

@@ -1,8 +1,9 @@
+import { useState } from "react";
 import { providersFor, TIER_LABEL } from "../providers";
 import { useStore, setSecret } from "../store";
 import { FieldEditor } from "./FieldEditor";
 import { IconExternal } from "../icons";
-import type { StageKind } from "../types";
+import type { Provider, StageKind } from "../types";
 
 const KINDS: { kind: StageKind; label: string }[] = [
   { kind: "llm", label: "Text / LLM" },
@@ -31,41 +32,9 @@ export function Settings() {
         <div key={kind}>
           <div className="section-title">{label}</div>
           <div className="settings-grid">
-            {providersFor(kind).map((p) => {
-              const cfg = secrets[p.id] || {};
-              return (
-                <div className="provider-card" key={p.id}>
-                  <div className="head">
-                    <span className={"badge " + p.tier}>{TIER_LABEL[p.tier]}</span>
-                    <span className="name">{p.name}</span>
-                    {p.note && <span className="pill">{p.note}</span>}
-                    <span className="kind">
-                      {p.signupUrl && (
-                        <a className="link-ext" href={p.signupUrl} target="_blank" rel="noreferrer">
-                          Get key <IconExternal size={12} />
-                        </a>
-                      )}
-                    </span>
-                  </div>
-                  {p.secrets.length === 0 ? (
-                    <div className="pill" style={{ display: "inline-block" }}>
-                      {p.needsBackend ? "No key — but needs the Phase-2 backend" : "No API key required"}
-                    </div>
-                  ) : (
-                    <div className="fields-row">
-                      {p.secrets.map((f) => (
-                        <FieldEditor
-                          key={f.key}
-                          field={f}
-                          value={cfg[f.key] ?? ""}
-                          onChange={(v) => setSecret(p.id, f.key, v)}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {providersFor(kind).map((p) => (
+              <ProviderCard key={p.id} p={p} cfg={secrets[p.id] || {}} />
+            ))}
           </div>
         </div>
       ))}
@@ -75,6 +44,60 @@ export function Settings() {
         (voice). That gets you a full run with just one free Gemini key. Add ElevenLabs or the Edge-TTS backend later
         for downloadable, higher-quality narration.
       </div>
+    </div>
+  );
+}
+
+function ProviderCard({ p, cfg }: { p: Provider; cfg: Record<string, string> }) {
+  const [draft, setDraft] = useState<Record<string, string>>(cfg);
+  const [justSaved, setJustSaved] = useState(false);
+
+  const dirty = p.secrets.some((f) => (draft[f.key] ?? "") !== (cfg[f.key] ?? ""));
+
+  function handleSave() {
+    for (const f of p.secrets) setSecret(p.id, f.key, draft[f.key] ?? "");
+    setJustSaved(true);
+    setTimeout(() => setJustSaved(false), 2500);
+  }
+
+  return (
+    <div className="provider-card">
+      <div className="head">
+        <span className={"badge " + p.tier}>{TIER_LABEL[p.tier]}</span>
+        <span className="name">{p.name}</span>
+        {p.note && <span className="pill">{p.note}</span>}
+        <span className="kind">
+          {p.signupUrl && (
+            <a className="link-ext" href={p.signupUrl} target="_blank" rel="noreferrer">
+              Get key <IconExternal size={12} />
+            </a>
+          )}
+        </span>
+      </div>
+      {p.secrets.length === 0 ? (
+        <div className="pill" style={{ display: "inline-block" }}>
+          {p.needsBackend ? "No key — but needs the Phase-2 backend" : "No API key required"}
+        </div>
+      ) : (
+        <>
+          <div className="fields-row">
+            {p.secrets.map((f) => (
+              <FieldEditor
+                key={f.key}
+                field={f}
+                value={draft[f.key] ?? ""}
+                onChange={(v) => setDraft((d) => ({ ...d, [f.key]: v }))}
+              />
+            ))}
+          </div>
+          <div className="save-row">
+            <button type="button" className="btn sm primary" disabled={!dirty} onClick={handleSave}>
+              Save
+            </button>
+            {justSaved && <span className="save-success">Saved successfully</span>}
+          </div>
+        </>
+      )}
     </div>
   );
 }
