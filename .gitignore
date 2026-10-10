@@ -5,3 +5,7 @@ backend/__pycache__/
 *.pyc
 .env
 .env.local
+# AI YT Studio v2 (UAT)
+data/
+frontend/dist/
+backend/.pytest_cache/

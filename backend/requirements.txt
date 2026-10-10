@@ -5,3 +5,7 @@ moviepy>=2.1.1
 pillow>=10.2
 numpy>=1.26
 requests>=2.31
+# --- AI YT Studio v2 (backend/app) additions; legacy deps above stay for backend/main.py ---
+imageio-ffmpeg>=0.5
+pytest>=8
+httpx>=0.27

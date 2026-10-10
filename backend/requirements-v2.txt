@@ -1,0 +1,8 @@
+# Runtime deps for the v2 app (backend/app) only — used by the Dockerfile.
+# The legacy backend/main.py keeps using requirements.txt (incl. MoviePy).
+fastapi>=0.110
+uvicorn[standard]>=0.29
+edge-tts>=7.0
+requests>=2.31
+pillow>=10.2
+numpy>=1.26
