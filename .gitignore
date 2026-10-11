@@ -9,3 +9,4 @@ backend/__pycache__/
 data/
 frontend/dist/
 backend/.pytest_cache/
+backend/tests/.artifacts*/

@@ -4,6 +4,8 @@ import { Login } from "./pages/Login";
 import { Home } from "./pages/Home";
 import { Settings } from "./pages/Settings";
 import { ComingSoon } from "./pages/ComingSoon";
+import { EditNew } from "./pages/EditNew";
+import { EditProject } from "./pages/EditProject";
 
 function useHashRoute(): string {
   const [route, setRoute] = useState(() => window.location.hash.replace(/^#/, "") || "/");
@@ -35,7 +37,10 @@ export function App() {
 
   let page;
   if (route.startsWith("/settings")) page = <Settings />;
-  else if (route.startsWith("/edit")) page = <ComingSoon title="वीडियो एडिट करो" phase="Phase 2" />;
+  else if (route.startsWith("/edit/")) {
+    const id = route.slice("/edit/".length).split("/")[0];
+    page = <EditProject key={id} id={id} />;
+  } else if (route.startsWith("/edit")) page = <EditNew />;
   else if (route.startsWith("/create")) page = <ComingSoon title="टॉपिक से वीडियो बनाओ" phase="Phase 3" />;
   else page = <Home />;
 

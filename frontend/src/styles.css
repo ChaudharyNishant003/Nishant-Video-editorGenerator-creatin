@@ -102,3 +102,28 @@ button.link { background: none; border: 0; color: var(--muted); font: inherit; c
 .joblog { list-style: none; padding: 0; margin: 8px 0 0; font-size: 0.85rem; max-height: 180px; overflow: auto; }
 .joblog li { padding: 3px 0; border-bottom: 1px dashed var(--border); }
 .joblog li.warn { color: var(--warn); } .joblog li.error { color: var(--err); }
+
+/* Workflow A */
+h3 { font-size: 1rem; margin: 14px 0 8px; }
+textarea.input { min-height: 88px; resize: vertical; }
+.player { width: 100%; max-height: 60vh; background: #000; border-radius: 10px; display: block; }
+.transcript { list-style: none; padding: 0; margin: 8px 0; max-height: 260px; overflow: auto; }
+.transcript li { display: flex; gap: 8px; align-items: baseline; border-bottom: 1px dashed var(--border); }
+.transcript .ts { color: #9fb3ff; font-variant-numeric: tabular-nums; min-width: 56px; }
+.warnlist { margin: 8px 0; padding-left: 20px; color: var(--warn); font-size: 0.9rem; }
+.ops { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.op { background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
+.ophead { display: flex; align-items: center; gap: 8px; }
+.ophead .btn { margin-left: auto; }
+.tag.ai { background: #3b3366; color: #d9cfff; }
+.opfields { display: flex; flex-wrap: wrap; gap: 8px 12px; margin-top: 6px; }
+.tfield { display: flex; flex-direction: column; gap: 2px; margin: 0; min-width: 120px; flex: 1 1 140px; }
+.tfield.wide { flex: 1 1 100%; }
+.trow { display: flex; gap: 6px; }
+.trow .input { min-width: 0; font-variant-numeric: tabular-nums; }
+.btn.icon { min-width: 44px; padding: 8px 10px; }
+.check { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; margin: 0; }
+.check input { width: 20px; height: 20px; }
+.filepick { cursor: pointer; align-self: flex-end; }
+.filepick.disabled { opacity: 0.45; pointer-events: none; }
+.grow-select { flex: 1; min-width: 0; width: auto; }

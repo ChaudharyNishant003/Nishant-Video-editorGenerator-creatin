@@ -74,6 +74,45 @@ def test_sentinel_key_never_persisted_or_logged(authed, data_dir, monkeypatch, c
     assert SENTINEL not in caplog.text, "sentinel found in logs"
 
 
+def test_sentinel_key_through_workflow_a(authed, data_dir, monkeypatch, caplog, tmp_path):
+    """Keys sent to transcribe / plan / render (stock b-roll) jobs never reach disk, DB, logs or responses."""
+    import subprocess
+
+    from app.render.ffmpeg import ffmpeg_exe
+
+    def fake_request(method, url, **kw):
+        return _FakeResp(401, text=f"bad key {SENTINEL}")
+
+    monkeypatch.setattr(requests, "request", fake_request)
+    caplog.set_level(logging.INFO)
+    hdr = {"X-Provider-Keys": encode_keys_header({"groq": {"apiKey": SENTINEL}, "gemini": {"apiKey": SENTINEL},
+                                                   "pexels": {"apiKey": SENTINEL}, "pixabay": {"apiKey": SENTINEL}})}
+    clip = tmp_path / "c.mp4"
+    subprocess.run([ffmpeg_exe(), "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=320x240:r=25:d=4",
+                    "-f", "lavfi", "-i", "sine=d=4", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", str(clip)], check=True)
+    pid = authed.post("/api/projects", json={"kind": "edit"}).json()["id"]
+    ingest = authed.post(f"/api/projects/{pid}/upload?kind=source&name=c.mp4", content=clip.read_bytes()).json()["job_id"]
+
+    def wait(jid):
+        for _ in range(300):
+            j = authed.get(f"/api/jobs/{jid}").json()
+            if j["status"] in ("done", "failed", "cancelled"):
+                return j
+            time.sleep(0.1)
+
+    assert wait(ingest)["status"] == "done"
+    t = wait(authed.post(f"/api/projects/{pid}/transcribe", json={}, headers=hdr).json()["job_id"])
+    assert t["status"] == "failed" and SENTINEL not in str(t)
+    r = authed.post(f"/api/projects/{pid}/plan", json={"prompt": "कट करो"}, headers=hdr)
+    assert r.status_code == 502 and SENTINEL not in r.text
+    authed.put(f"/api/projects/{pid}/plan", json={"plan": {"ops": [{"type": "broll", "start": 1, "end": 2, "source": "stock:city"}]}})
+    rj = wait(authed.post(f"/api/projects/{pid}/approve-and-render", headers=hdr).json()["job_id"])
+    assert rj["status"] == "done" and rj["result"]["notices"] and SENTINEL not in str(rj)
+
+    assert SENTINEL.encode() not in _all_bytes_under(data_dir), "sentinel found in data dir / SQLite"
+    assert SENTINEL not in caplog.text, "sentinel found in logs"
+
+
 def test_redact_patterns():
     assert "[REDACTED]" in redact("Authorization: Bearer sk-abcdefghijklmnop")
     assert "gsk_abcdefghijklmnop" not in redact("token gsk_abcdefghijklmnop")

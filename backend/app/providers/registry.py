@@ -12,6 +12,8 @@ ALL: list[Provider] = [*llm.PROVIDERS, *speech.PROVIDERS, *media.PROVIDERS]
 _BY_ID = {p.id: p for p in ALL}
 assert len(_BY_ID) == len(ALL), "duplicate provider id"
 
+CAP_HI = {"llm": "AI मॉडल (LLM)", "stt": "Transcript (STT)", "tts": "आवाज़ (TTS)", "image": "इमेज",
+          "stock": "स्टॉक फ़ुटेज", "avatar": "अवतार"}
 MAX_ATTEMPTS_PER_PROVIDER = 2  # cap retries (OpenRouter counts failed requests)
 MAX_RETRY_WAIT_S = 10.0
 
@@ -66,7 +68,7 @@ def run_with_fallback(
     raises ProviderError('all_failed') when every option fails."""
     candidates = chain(capability, preferred_id, all_keys)
     if not candidates:
-        raise ProviderError("all_failed", f"'{capability}' के लिए कोई provider उपलब्ध नहीं — Settings में key डालें।")
+        raise ProviderError("all_failed", f"{CAP_HI.get(capability, capability)} के लिए कोई provider उपलब्ध नहीं — Settings में key डालें।")
     errors: list[str] = []
     for idx, p in enumerate(candidates):
         if not p.has_keys(all_keys):

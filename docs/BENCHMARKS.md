@@ -13,4 +13,11 @@ Measured timings (PRD §14 cross-cutting). Machine: owner's laptop, Intel i3-500
 | 2026-10-10 | Edge-TTS Hindi (Swara/Madhur), 18-word sentence, WordBoundary | network | ≈1.5 s; 18/18 word timings |
 | 2026-10-10 | v2 job runner: cancel of a running ffmpeg job | pytest `test_cancel_kills_ffmpeg_within_seconds` + UI test | process gone in < 5 s (UI: cancelled at 14 %) |
 
-Not measured: Groq Whisper (needs key), anything on Railway, real avatar art.
+| 2026-10-11 | Workflow A ingest, 3:00 1280×720 30 fps H.264 → CFR 720p work file + FLAC | local API | **83 s** (≈ 2.2× real time) |
+| 2026-10-11 | Workflow A render, same 3:00 video: 2 cuts + remove_silence (35 silences) + word-highlight captions (251 words) + overlay + 2 zooms + 1.5× speed + denoise/loudnorm → 1:42.8 | 36 segments + final pass | **101 s**; duration = time map (102.83 vs 102.833) |
+| 2026-10-11 | Workflow A render, 0:30 demo: cut + silence + captions + overlay + zoom → 0:15.5 | UI | 16.2 s |
+| 2026-10-11 | same 0:30 demo without silence removal (re-render, plan v2) → 0:25.0 | UI | 25.6 s |
+
+So a 3-minute edit takes about 3 minutes on this laptop (ingest + render), plus STT time. That is within the PRD's ~5 min budget, and Groq STT is untested.
+
+Not measured: Groq Whisper (needs key), LLM plan latency (needs key), anything on Railway, real avatar art.

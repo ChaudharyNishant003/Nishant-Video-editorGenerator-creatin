@@ -10,8 +10,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
-from . import auth, db
+from . import auth, db, storage
 from .config import settings
+from .edit import routes as edit_routes
 from .jobs import TERMINAL, runner
 from .providers import registry
 from .providers.base import ProviderError
@@ -33,6 +34,7 @@ async def lifespan(_app):
 
 app = FastAPI(title="AI YT Studio v2", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 app.include_router(auth.router)
+app.include_router(edit_routes.router)
 
 PUBLIC_API = ("/api/auth/", "/api/health")
 CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
@@ -158,9 +160,15 @@ def get_project(project_id: str):
 def delete_project(project_id: str):
     get_project(project_id)
     with db.locked() as c:
+        active = [r["id"] for r in c.execute("SELECT id FROM jobs WHERE project_id=? AND status IN ('queued','running')",
+                                             (project_id,)).fetchall()]
+    for job_id in active:
+        runner.cancel(job_id)
+    with db.locked() as c:
         for table in ("assets", "transcripts", "edit_plans", "scripts", "jobs"):
             c.execute(f"DELETE FROM {table} WHERE project_id=?", (project_id,))
         c.execute("DELETE FROM projects WHERE id=?", (project_id,))
+    storage.remove_project_dir(project_id)  # media of this v2 project only (DATA_DIR/projects/<id>)
     return {"ok": True}
 
 

@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 
-type Project = { id: string; kind: "edit" | "create"; title: string; status: string; updated_at: number };
+const STATUS: Record<string, string> = {
+  draft: "शुरुआत", uploaded: "अपलोड हुआ", ingesting: "तैयार हो रहा", ingested: "तैयार", ingest_failed: "अपलोड विफल",
+  transcribing: "transcript बन रहा", transcribed: "transcript तैयार", transcribe_failed: "transcript विफल",
+  planned: "प्लान तैयार", rendering: "रेंडर हो रहा", done: "पूरा", render_failed: "रेंडर विफल",
+};
+
+type Project ={ id: string; kind: "edit" | "create"; title: string; status: string; updated_at: number };
 
 export function Home() {
   const [projects, setProjects] = useState<Project[] | null>(null);
@@ -37,7 +43,8 @@ export function Home() {
           {projects.map((p) => (
             <li key={p.id}>
               <span className={"tag " + p.kind}>{p.kind === "edit" ? "एडिट" : "बनाओ"}</span>
-              <span className="grow">{p.title}</span>
+              {p.kind === "edit" ? <a className="grow" href={`#/edit/${p.id}`}>{p.title}</a> : <span className="grow">{p.title}</span>}
+              <span className="muted small">{STATUS[p.status] || p.status}</span>
               <span className="muted small">{new Date(p.updated_at * 1000).toLocaleDateString("hi-IN")}</span>
             </li>
           ))}

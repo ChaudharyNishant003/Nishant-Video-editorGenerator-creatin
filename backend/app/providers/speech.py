@@ -52,10 +52,11 @@ def groq_whisper_transcribe(audio_path: Path, keys: dict, language: str = "hi", 
     p = Path(audio_path)
     if p.stat().st_size > 25 * 1024 * 1024:
         raise ProviderError("error", "Groq Whisper: audio 25 MB से बड़ा है।")
+    mime = {".flac": "audio/flac", ".wav": "audio/wav", ".m4a": "audio/mp4"}.get(p.suffix.lower(), "audio/mpeg")
     with open(p, "rb") as f:
         resp = http("POST", "https://api.groq.com/openai/v1/audio/transcriptions", "Groq Whisper",
                     headers={"Authorization": f"Bearer {keys['apiKey']}"},
-                    files={"file": (p.name, f, "audio/mpeg")},
+                    files={"file": (p.name, f, mime)},
                     data={"model": model, "response_format": "verbose_json", "language": language,
                           "timestamp_granularities[]": "word"},
                     timeout=300)

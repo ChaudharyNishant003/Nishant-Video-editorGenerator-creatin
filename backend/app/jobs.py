@@ -62,11 +62,14 @@ class JobContext:
 
     # --- ffmpeg -----------------------------------------------------------
     def run_ffmpeg(self, args: list[str], expected_duration_s: float | None = None,
-                   pct_from: float = 0.0, pct_to: float = 100.0, step: str | None = None) -> None:
-        """Run ffmpeg with -progress on stdout; maps out_time to job progress; cancellable."""
+                   pct_from: float = 0.0, pct_to: float = 100.0, step: str | None = None,
+                   cwd: str | None = None, collect_stderr: bool = False) -> list[str]:
+        """Run ffmpeg with -progress on stdout; maps out_time to job progress; cancellable.
+        Returns the stderr lines when collect_stderr (e.g. silencedetect output), else []."""
         self.check_cancelled()
         cmd = [ffmpeg_exe(), "-hide_banner", "-nostdin", "-y", "-progress", "pipe:1", "-nostats", *args]
-        kwargs: dict = {"stdout": subprocess.PIPE, "stderr": subprocess.PIPE, "text": True, "encoding": "utf-8", "errors": "replace"}
+        kwargs: dict = {"stdout": subprocess.PIPE, "stderr": subprocess.PIPE, "text": True, "encoding": "utf-8",
+                        "errors": "replace", "cwd": cwd}
         if sys.platform == "win32":
             kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
         else:
@@ -77,11 +80,14 @@ class JobContext:
             self._proc = subprocess.Popen(cmd, **kwargs)
         proc = self._proc
         stderr_tail: list[str] = []
+        stderr_all: list[str] = []
 
         def _drain_stderr():
             for line in proc.stderr:
                 stderr_tail.append(line.rstrip())
                 del stderr_tail[:-30]
+                if collect_stderr:
+                    stderr_all.append(line.rstrip())
 
         t = threading.Thread(target=_drain_stderr, daemon=True)
         t.start()
@@ -107,6 +113,7 @@ class JobContext:
         if proc.returncode != 0:
             raise RuntimeError("ffmpeg विफल (code %s): %s" % (proc.returncode, " | ".join(stderr_tail[-5:])))
         self.progress(pct_to)
+        return stderr_all
 
     def _kill(self) -> None:
         with self._lock:
