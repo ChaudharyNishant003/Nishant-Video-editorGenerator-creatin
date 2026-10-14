@@ -35,13 +35,13 @@ def _err(status: int, code: str, message: str):
     raise HTTPException(status_code=status, detail={"code": code, "message": message})
 
 
-def _project(pid: str) -> dict:
+def _project(pid: str, allow_create: bool = False) -> dict:
     with db.locked() as c:
         row = c.execute("SELECT * FROM projects WHERE id=?", (pid,)).fetchone()
     if row is None:
         _err(404, "not_found", "प्रोजेक्ट नहीं मिला।")
     p = db.row_to_dict(row)
-    if p["kind"] != "edit":
+    if p["kind"] != "edit" and not (allow_create and p["kind"] == "create"):
         _err(400, "wrong_kind", "यह 'वीडियो एडिट' प्रोजेक्ट नहीं है।")
     return p
 
@@ -87,7 +87,7 @@ def _work_duration(pid: str) -> float:
 @router.post("/projects/{pid}/upload")
 async def upload(pid: str, request: Request, kind: str = Query("source"), name: str = Query("video.mp4"),
                  language: str = Query("hi")):
-    project = await run_in_threadpool(_project, pid)
+    project = await run_in_threadpool(_project, pid, kind == "music")  # Workflow B may upload music only
     if kind not in UPLOAD_EXT:
         _err(400, "bad_kind", "अज्ञात upload प्रकार।")
     ext = Path(name).suffix.lower()
@@ -287,6 +287,11 @@ def get_asset(aid: str, download: int = 0):
     if settings.data_dir not in path.parents or not path.is_file():
         _err(404, "not_found", "फ़ाइल नहीं मिली।")
     name = (a.get("meta") or {}).get("name") or path.name
+    if download and a["kind"] in ("output", "thumbnail"):
+        with db.locked() as c:
+            prow = db.row_to_dict(c.execute("SELECT * FROM projects WHERE id=?", (a["project_id"],)).fetchone())
+        if prow and prow["kind"] == "create" and not (prow.get("settings") or {}).get("disclosure_ack_at"):
+            _err(403, "disclosure_required", "डाउनलोड से पहले AI-disclosure की पुष्टि करें (PRD §5.5)।")
     if download:
         return FileResponse(path, media_type=a.get("mime") or "application/octet-stream", filename=name)
     return FileResponse(path, media_type=a.get("mime") or "application/octet-stream")

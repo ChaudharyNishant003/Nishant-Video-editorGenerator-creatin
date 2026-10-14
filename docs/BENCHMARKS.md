@@ -18,6 +18,12 @@ Measured timings (PRD §14 cross-cutting). Machine: owner's laptop, Intel i3-500
 | 2026-10-11 | Workflow A render, 0:30 demo: cut + silence + captions + overlay + zoom → 0:15.5 | UI | 16.2 s |
 | 2026-10-11 | same 0:30 demo without silence removal (re-render, plan v2) → 0:25.0 | UI | 25.6 s |
 
+| 2026-10-14 | Workflow B scene render (avatar + insert + captions), 8.5 s scene | 1280×720 / 720×1280, 24 fps, Pillow sprites → ffmpeg stdin | 6.4–9.5 s per scene (≈ 0.75–1.1× real time) |
+| 2026-10-14 | Workflow B 1-min run, 27.2 s video, 6 scenes (mocked LLM, real Edge-TTS, synthetic images) | API, 16:9 / 9:16 | 42.6 s / 47.4 s generate |
+| 2026-10-14 | Workflow B key-free UI run, 25.7 s video, 3 scenes (real Edge-TTS + real Pollinations) | browser | 105.7 s, mostly Pollinations pacing (~30 s per image on the anonymous tier) |
+| 2026-10-14 | Workflow B per-scene "new picture" regenerate | browser | 23.3 s (one scene + final join + pack) |
+| 2026-10-14 | Pollinations anonymous tier | 1280×720, flux | 8–31 s per image when requests are ≥ 30 s apart; immediate 402 when they follow each other |
+
 So a 3-minute edit takes about 3 minutes on this laptop (ingest + render), plus STT time. That is within the PRD's ~5 min budget, and Groq STT is untested.
 
 Not measured: Groq Whisper (needs key), LLM plan latency (needs key), anything on Railway, real avatar art.

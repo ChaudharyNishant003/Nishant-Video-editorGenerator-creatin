@@ -5,6 +5,9 @@ const STATUS: Record<string, string> = {
   draft: "शुरुआत", uploaded: "अपलोड हुआ", ingesting: "तैयार हो रहा", ingested: "तैयार", ingest_failed: "अपलोड विफल",
   transcribing: "transcript बन रहा", transcribed: "transcript तैयार", transcribe_failed: "transcript विफल",
   planned: "प्लान तैयार", rendering: "रेंडर हो रहा", done: "पूरा", render_failed: "रेंडर विफल",
+  configured: "सेटिंग तैयार", researching: "research चल रहा", researched: "तथ्य तैयार", research_failed: "research विफल",
+  scripting: "स्क्रिप्ट बन रही", scripted: "स्क्रिप्ट तैयार", script_failed: "स्क्रिप्ट विफल",
+  generating: "वीडियो बन रहा", generate_failed: "वीडियो विफल", expired: "मीडिया हटाया गया (पुराना)",
 };
 
 type Project ={ id: string; kind: "edit" | "create"; title: string; status: string; updated_at: number };
@@ -43,7 +46,7 @@ export function Home() {
           {projects.map((p) => (
             <li key={p.id}>
               <span className={"tag " + p.kind}>{p.kind === "edit" ? "एडिट" : "बनाओ"}</span>
-              {p.kind === "edit" ? <a className="grow" href={`#/edit/${p.id}`}>{p.title}</a> : <span className="grow">{p.title}</span>}
+              <a className="grow" href={`#/${p.kind}/${p.id}`}>{p.title}</a>
               <span className="muted small">{STATUS[p.status] || p.status}</span>
               <span className="muted small">{new Date(p.updated_at * 1000).toLocaleDateString("hi-IN")}</span>
             </li>

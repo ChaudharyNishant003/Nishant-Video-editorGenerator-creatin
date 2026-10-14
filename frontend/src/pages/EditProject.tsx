@@ -11,10 +11,20 @@ const STEP_LABEL: Record<string, string> = {
   silence: "खामोशी ढूँढी जा रही है", "b-roll": "B-roll लाया जा रहा है", final: "आख़िरी वीडियो बन रहा है",
 };
 
+const COUNTED: Record<string, string> = {
+  segment: "हिस्से जोड़े जा रहे हैं", voice: "आवाज़ बन रही है", visual: "तस्वीरें लाई जा रही हैं", scene: "सीन बन रहे हैं",
+  chapter: "अध्याय लिखा जा रहा है",
+};
+const STEP_LABEL_B: Record<string, string> = {
+  sources: "Wikipedia से स्रोत", facts: "तथ्य निकाले जा रहे हैं", outline: "रूपरेखा बन रही है", roman: "Roman कैप्शन",
+  pack: "YouTube पैक", thumbnail: "थंबनेल", intro: "Intro जोड़ा जा रहा है", outro: "Outro जोड़ा जा रहा है", reframe: "फ्रेम सेट हो रहा है",
+};
+
 function stepLabel(step: string | null): string {
   if (!step) return "";
-  if (step.startsWith("segment")) return `हिस्से जोड़े जा रहे हैं (${step.slice(8)})`;
-  return STEP_LABEL[step] || step;
+  const [head, count] = step.split(" ");
+  if (COUNTED[head]) return count ? `${COUNTED[head]} (${count})` : COUNTED[head];
+  return STEP_LABEL[step] || STEP_LABEL_B[step] || step;
 }
 
 /** Workflow A: transcript → prompt → editable plan → approve → render → result. */

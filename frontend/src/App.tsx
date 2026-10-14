@@ -3,7 +3,8 @@ import { api } from "./api";
 import { Login } from "./pages/Login";
 import { Home } from "./pages/Home";
 import { Settings } from "./pages/Settings";
-import { ComingSoon } from "./pages/ComingSoon";
+import { CreateNew } from "./pages/CreateNew";
+import { CreateProject } from "./pages/CreateProject";
 import { EditNew } from "./pages/EditNew";
 import { EditProject } from "./pages/EditProject";
 
@@ -41,7 +42,10 @@ export function App() {
     const id = route.slice("/edit/".length).split("/")[0];
     page = <EditProject key={id} id={id} />;
   } else if (route.startsWith("/edit")) page = <EditNew />;
-  else if (route.startsWith("/create")) page = <ComingSoon title="टॉपिक से वीडियो बनाओ" phase="Phase 3" />;
+  else if (route.startsWith("/create/")) {
+    const id = route.slice("/create/".length).split("/")[0];
+    page = <CreateProject key={id} id={id} />;
+  } else if (route.startsWith("/create")) page = <CreateNew />;
   else page = <Home />;
 
   return (

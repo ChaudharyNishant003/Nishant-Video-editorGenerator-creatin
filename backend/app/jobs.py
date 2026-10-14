@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import signal
@@ -17,7 +18,7 @@ import threading
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor
-from typing import Callable
+from typing import Callable, Iterable
 
 from . import db
 from .config import settings
@@ -63,13 +64,17 @@ class JobContext:
     # --- ffmpeg -----------------------------------------------------------
     def run_ffmpeg(self, args: list[str], expected_duration_s: float | None = None,
                    pct_from: float = 0.0, pct_to: float = 100.0, step: str | None = None,
-                   cwd: str | None = None, collect_stderr: bool = False) -> list[str]:
+                   cwd: str | None = None, collect_stderr: bool = False,
+                   stdin_frames: Iterable[bytes] | None = None) -> list[str]:
         """Run ffmpeg with -progress on stdout; maps out_time to job progress; cancellable.
-        Returns the stderr lines when collect_stderr (e.g. silencedetect output), else []."""
+        Returns the stderr lines when collect_stderr (e.g. silencedetect output), else [].
+        stdin_frames: raw bytes fed to ffmpeg's stdin by a writer thread (use `-i pipe:0` in args),
+        e.g. avatar frames rendered in Python."""
         self.check_cancelled()
-        cmd = [ffmpeg_exe(), "-hide_banner", "-nostdin", "-y", "-progress", "pipe:1", "-nostats", *args]
-        kwargs: dict = {"stdout": subprocess.PIPE, "stderr": subprocess.PIPE, "text": True, "encoding": "utf-8",
-                        "errors": "replace", "cwd": cwd}
+        cmd = [ffmpeg_exe(), "-hide_banner", *([] if stdin_frames is not None else ["-nostdin"]), "-y",
+               "-progress", "pipe:1", "-nostats", *args]
+        kwargs: dict = {"stdout": subprocess.PIPE, "stderr": subprocess.PIPE, "cwd": cwd,
+                        "stdin": subprocess.PIPE if stdin_frames is not None else subprocess.DEVNULL}
         if sys.platform == "win32":
             kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
         else:
@@ -79,20 +84,44 @@ class JobContext:
         with self._lock:
             self._proc = subprocess.Popen(cmd, **kwargs)
         proc = self._proc
+        stdout = io.TextIOWrapper(proc.stdout, encoding="utf-8", errors="replace")
+        stderr = io.TextIOWrapper(proc.stderr, encoding="utf-8", errors="replace")
         stderr_tail: list[str] = []
         stderr_all: list[str] = []
+        feed_errors: list[BaseException] = []
 
         def _drain_stderr():
-            for line in proc.stderr:
+            for line in stderr:
                 stderr_tail.append(line.rstrip())
                 del stderr_tail[:-30]
                 if collect_stderr:
                     stderr_all.append(line.rstrip())
 
+        def _feed_stdin():
+            try:
+                for chunk in stdin_frames:
+                    if self.cancel_event.is_set():
+                        break
+                    proc.stdin.write(chunk)
+            except (BrokenPipeError, ConnectionResetError, ValueError, OSError):
+                pass  # ffmpeg exited early; its return code tells the story
+            except BaseException as e:  # a bug in the frame generator must fail the job
+                feed_errors.append(e)
+                self._kill()
+            finally:
+                try:
+                    proc.stdin.close()
+                except Exception:
+                    pass
+
         t = threading.Thread(target=_drain_stderr, daemon=True)
         t.start()
+        feeder = None
+        if stdin_frames is not None:
+            feeder = threading.Thread(target=_feed_stdin, daemon=True)
+            feeder.start()
         try:
-            for line in proc.stdout:
+            for line in stdout:
                 if self.cancel_event.is_set():
                     self._kill()
                     break
@@ -105,11 +134,15 @@ class JobContext:
                         pass
             proc.wait()
         finally:
+            if feeder is not None:
+                feeder.join(timeout=5)
             t.join(timeout=2)
             with self._lock:
                 self._proc = None
         if self.cancel_event.is_set():
             raise JobCancelled()
+        if feed_errors:
+            raise feed_errors[0]
         if proc.returncode != 0:
             raise RuntimeError("ffmpeg विफल (code %s): %s" % (proc.returncode, " | ".join(stderr_tail[-5:])))
         self.progress(pct_to)

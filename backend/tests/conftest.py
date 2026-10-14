@@ -40,3 +40,13 @@ def authed(client):
 def pytest_configure(config):
     config.addinivalue_line("markers", "network: needs internet but no key")
     config.addinivalue_line("markers", "needs_key: needs a real provider key (owner adds on Settings page)")
+
+
+@pytest.fixture(autouse=True)
+def _no_image_pacing(monkeypatch):
+    """Pollinations pacing/back-off waits are real-world rate limiting; tests use fakes, so skip the waits."""
+    from app.create import visuals
+
+    monkeypatch.setattr(visuals, "AI_PACE_S", 0.0)
+    real_ai = visuals._ai
+    monkeypatch.setattr(visuals, "_ai", lambda q, v, a, d, sleep=None: real_ai(q, v, a, d, lambda s: None))

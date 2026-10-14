@@ -12,6 +12,8 @@ from pydantic import BaseModel
 
 from . import auth, db, storage
 from .config import settings
+from . import brand_routes
+from .create import routes as create_routes
 from .edit import routes as edit_routes
 from .jobs import TERMINAL, runner
 from .providers import registry
@@ -35,6 +37,8 @@ async def lifespan(_app):
 app = FastAPI(title="AI YT Studio v2", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 app.include_router(auth.router)
 app.include_router(edit_routes.router)
+app.include_router(create_routes.router)
+app.include_router(brand_routes.router)
 
 PUBLIC_API = ("/api/auth/", "/api/health")
 CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "

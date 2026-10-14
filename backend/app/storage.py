@@ -56,6 +56,29 @@ def set_status(project_id: str, status: str) -> None:
         c.execute("UPDATE projects SET status=?, updated_at=? WHERE id=?", (status, db.now(), project_id))
 
 
+async def stream_to(request, target: Path, limit_bytes: int) -> int:
+    """Stream a raw request body to target (via .part); nothing is left behind on failure. Returns size.
+    Raises ValueError('too_large') / ValueError('empty')."""
+    part = target.with_suffix(target.suffix + ".part")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    size = 0
+    try:
+        with open(part, "wb") as f:
+            async for chunk in request.stream():
+                size += len(chunk)
+                if size > limit_bytes:
+                    raise ValueError("too_large")
+                f.write(chunk)
+    except BaseException:
+        part.unlink(missing_ok=True)
+        raise
+    if size == 0:
+        part.unlink(missing_ok=True)
+        raise ValueError("empty")
+    part.replace(target)
+    return size
+
+
 def public_asset(a: dict) -> dict:
     """Asset fields safe for the UI (no server paths)."""
     meta = a.get("meta") or {}

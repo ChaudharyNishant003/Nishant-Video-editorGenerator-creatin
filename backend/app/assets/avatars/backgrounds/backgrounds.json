@@ -1,0 +1,29 @@
+{
+  "study": {
+    "label": "पढ़ाई का कमरा",
+    "files": {
+      "16x9": "study_16x9.jpg",
+      "9x16": "study_9x16.jpg",
+      "1x1": "study_1x1.jpg"
+    },
+    "preview": "study_preview.jpg"
+  },
+  "library": {
+    "label": "लाइब्रेरी",
+    "files": {
+      "16x9": "library_16x9.jpg",
+      "9x16": "library_9x16.jpg",
+      "1x1": "library_1x1.jpg"
+    },
+    "preview": "library_preview.jpg"
+  },
+  "studio": {
+    "label": "स्टूडियो",
+    "files": {
+      "16x9": "studio_16x9.jpg",
+      "9x16": "studio_9x16.jpg",
+      "1x1": "studio_1x1.jpg"
+    },
+    "preview": "studio_preview.jpg"
+  }
+}

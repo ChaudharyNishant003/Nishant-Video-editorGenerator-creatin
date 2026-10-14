@@ -108,3 +108,103 @@ Test totals (backend): **52 passed, 4 skipped (needs key)**, the same on Windows
 - Workflow A output keeps the source aspect and fps, but **fps is capped at 30 and the shortest side at 720 px**. This keeps a 3-minute edit near the PRD's 5-minute budget on this 2-core CPU. 1080p is a later option.
 - Music is **upload-only**: no bundled tracks, because of licensing (PRD risk 10).
 - The caption font on Windows dev is "Nirmala UI" (system font, copied into the render folder per job, never committed). In Docker it is Noto Sans Devanagari from `fonts-noto-core`. Dropping `NotoSansDevanagari-*.ttf` into `backend/app/assets/fonts/` makes it the first choice everywhere; this was not done, to avoid downloading files without approval.
+
+## Phase 3 — Workflow B "topic → avatar video" (2026-10-14)
+
+Owner decisions for this phase (2026-10-12):
+- Finish PRD v1, the handoff extras and Railway prep without stopping.
+- Avatar art is **drawn in code** (no downloads).
+- Hindi and Hinglish narration are both written in **Devanagari** and read by a hi-IN voice.
+- Tests use a mocked LLM and mocked stock providers. Checks that need a real key are reported as "not tested — needs key".
+- Rollback tag: `rollback-pre-phase3-2026-10-12`.
+
+### Built
+- **Avatar package** (`backend/tools/make_avatar_assets.py` → `backend/app/assets/avatars/`, project-owned art):
+  - 3 seated characters (आरव, मीरा, दादाजी). Each is a set of PNG layers plus `config.json`: chair, body, closed eyes, 4 mouth sprites, a beard/moustache layer and an outfit mask.
+  - 3 backgrounds (study, library, studio), each in 16:9, 9:16 and 1:1.
+  - 3 outfit tints, applied through the mask.
+  - Real art can replace the PNGs later with no code change.
+- **Avatar renderer** (`create/avatar.py`):
+  - The mouth level for each frame comes from the narration's loudness (RMS envelope). There is one window per frame (≈ 42 ms), smoothed and quantised to 4 levels with hysteresis, so it works for any language.
+  - Blinks every 3–6 s and a 0–2 px breathing sway.
+  - Every state is pre-composited. Frames stream as raw RGBA into ffmpeg's stdin through `JobContext.run_ffmpeg(stdin_frames=…)`, which stays cancellable.
+- **Composer** (`create/compose.py`): one ffmpeg process per scene.
+  - Layouts:
+    - `avatar_center_side_inserts`: a bordered insert that fades in and out, on alternating sides (on top in 9:16).
+    - `broll_fullscreen_avatar_corner`: Ken Burns on stills, trimmed/looped clips, avatar shown as a card.
+    - `avatar_only`
+    - `auto`
+  - The first scene of each chapter shows the chapter heading.
+  - Devanagari ASS captions use `ass…:shaping=complex`. Optional brand watermark and accent colour.
+  - Segments are H.264 + PCM. They are joined with the concat demuxer, then a final pass adds music ducking, loudnorm and AAC, plus an optional intro/outro.
+  - **Scene length = measured narration audio** + 0.35 s pad, rounded up to whole frames. Each scene and the total length are verified.
+- **Research** (`create/research.py`):
+  - Sources are Wikipedia (Hindi + English, via the MediaWiki API, no key, with a descriptive User-Agent) plus the user's notes.
+  - The LLM returns facts, each with a source URL. A fact that cites anything not actually fetched is forced to `uncertain`.
+  - Facts can be edited before the script is written.
+- **Script** (`create/script.py`, `create/models.py`):
+  - An outline with one chapter per minute, then one LLM call per chapter with a word budget (1.8 words/s, measured for Swara).
+  - Output is validated and repaired with pydantic. There is one repair retry on the same provider, then fallback to the next free LLM (`create/llmjson.py`).
+  - Resumable: a failed script job continues from the last finished chapter.
+  - **Manual script** ("मैं ख़ुद लिखूँगा") works with no key at all, with optional English keywords for the pictures.
+- **Voice** (`create/voice.py`): Edge-TTS per scene with word timings, cached by hash(text, voice, rate).
+- **Visuals** (`create/visuals.py`):
+  - Sources:
+    - Stock: Pexels → Pixabay, 24 h cache, files downloaded, attribution kept.
+    - Wikimedia Commons: now a real adapter, with author + licence attribution.
+    - Pollinations: now `safe=true`, educational style, paced.
+  - Devanagari queries are transliterated before any image search.
+  - A scene that gets no picture reuses an earlier picture from the same video (with a notice); if there is none, it falls back to `avatar_only`.
+- **YouTube pack** (`create/pack.py`):
+  - 3 titles and tags.
+  - A description with chapter timestamps taken from the real durations, plus sources, attribution and an AI-disclosure line.
+  - Per-platform texts for YouTube, Shorts, Instagram, LinkedIn and Facebook.
+  - A template is used when there is no key.
+  - Thumbnail at 1280×720: Pillow builds the base and libass draws the Devanagari title, because this Pillow build has no raqm.
+- **Roman Hinglish caption option** (`render/translit.py`): a rule-based transliterator, plus LLM transliteration when a key exists. Devanagari stays the default.
+- **Jobs/API** (`create/pipeline.py`, `create/routes.py`):
+  - Jobs: research, script, generate and per-scene regenerate (visual / voice / text). Generate is resumable and re-renders only changed scenes.
+  - Re-making the pack.
+  - Disclosure gate: downloads of the video, thumbnail and pack return 403 until the 4-point checklist is ticked.
+  - Scene media, catalog and voice preview endpoints.
+- **Frontend**:
+  - `#/create`: an 8-screen wizard: topic → language → format/length → avatar/outfit/background (with previews) → voice (with preview) → layout → captions → review, with optional music.
+  - `#/create/<id>`, the project page, has these sections:
+    - settings and the facts editor
+    - script editor or manual script
+    - generate, with progress, cancel and log
+    - result player and a scene list with per-scene regenerate
+    - YouTube pack, with platform tabs and copy buttons
+    - disclosure and downloads
+  - Home links to both project kinds.
+- Shared fix, which also improves Workflow A: caption groups no longer overlap in time. libass had stacked the overlapping lines in the wrong order.
+
+### Bugs found by real-provider testing, all fixed
+- Pollinations returned an irrelevant, unsuitable picture for a Hindi prompt. Fixes: `safe=true`, an educational style, Devanagari is never sent to image search or generation, and manual scripts can supply English picture keywords.
+- Pollinations' anonymous tier allows about one image per ~30 s per IP and answers 402 otherwise (measured). Fixes: pacing (≥ 20 s), back-off retries and picture reuse.
+- A Wikimedia thumbnail at a non-standard width failed to download. Fixes: standard 1280 px width, and try the next result on failure.
+
+### Acceptance checks (PRD §14 Workflow B)
+| Check | Result | How |
+|---|---|---|
+| 1-minute runs on free providers, 16:9 and 9:16 | ✅ pass (LLM mocked) | pytest `test_one_minute_runs_16x9_and_9x16` with a scripted LLM, tone TTS and synthetic images. Checks output size, durations, ≥ 2 layouts, chapters, thumbnail and attribution. |
+| 3-minute runs, 16:9 and 9:16 | see the Phase 4 acceptance run | `test_three_minute_runs_16x9_and_9x16` (AIYT_SLOW=1) |
+| Real key-free run in the UI | ✅ pass | Browser: wizard → skip research → manual script → generate with **real Edge-TTS + real Pollinations** → 25.7 s 16:9 video. Per-scene "नई तस्वीर" regenerate took 23 s. The production build on :8001 plays under CSP with no console errors. |
+| Avatar mouth follows speech; blinking; no frozen frames | ✅ pass | pytest: the dark mouth area is ≥ 3× larger during the tone than during silence; the eye region changes on blink frames; every 1-second window has ≥ 2 distinct frames (framemd5); frame count = duration × fps. |
+| Fallback: first LLM fails → automatic switch with a visible notice; never premium | ✅ pass (mocked) | pytest: Groq 429 → "Google Gemini पर switch किया" in the job log. `chain()` never includes premium. When all LLMs fail, status is `script_failed` and the previous script is kept. |
+| Stock cached (a second call within 24 h makes no request) | ✅ pass (mocked) | pytest `test_stock_search_cached_for_24h` (Pexels), plus the Wikimedia equivalent |
+| Scene durations = audio durations | ✅ pass | pytest: every scene = frames_for(audio + pad); total within 0.1 s; the render fails loudly otherwise |
+| Disclosure required before export | ✅ pass | pytest + UI: 403 before ticking, 400 if any checklist item is unticked, 200 after |
+| All layouts × 16:9 / 9:16 / 1:1, Devanagari conjuncts in captions | ✅ pass | pytest renders all 9 combinations with "क्षत्रिय श्रीमान द्वारा कर्मचारियों"; frames are in `backend/tests/.artifacts/` |
+| Resume after cancel; per-scene regenerate re-renders only that scene | ✅ pass | pytest: no new TTS calls on resume; only `scene_<id>.mkv` changes |
+| Sentinel key through research / script / generate | ✅ pass | pytest: data dir, SQLite and logs are clean |
+| 380 px layout, tap targets ≥ 44 px | ✅ pass | 375 px emulation of the wizard and project page (stepper chips fixed from 36 to 44 px) |
+| **Real LLM research / script / pack (Groq/Gemini/OpenRouter)** | ❌ not tested — needs key | The UI correctly shows "Research के लिए AI key चाहिए…" |
+| **Real Pexels/Pixabay stock** | ❌ not tested — needs key | Without keys the visual chain goes Wikimedia → Pollinations |
+
+Test totals (backend, Windows): **92 passed, 5 skipped** (4 need keys, 1 is the slow 3-minute run). Frontend: `tsc` strict ✅, `vite build` ✅.
+
+Known limitations:
+- Pollinations cannot draw real historical people. Use the Wikimedia picture option for people and monuments.
+- The anonymous Pollinations tier adds a small logo and is slow (~30 s per image).
+- The avatar look is drawn in code; the owner's review is pending.

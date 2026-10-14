@@ -81,8 +81,11 @@ def remap_words(words: list[dict], tm: TimeMap, rng: tuple[float, float] | None 
 def caption_events(words: list[dict], style: str) -> list[str]:
     events = []
     highlight = style == "hindi_bold_word_highlight"
-    for g in group_words(words, 4 if highlight else 7):
+    groups = group_words(words, 4 if highlight else 7)
+    for gi, g in enumerate(groups):
         g_end = g[-1]["end"] + 0.25
+        if gi + 1 < len(groups):  # never overlap the next group (libass would stack both lines)
+            g_end = max(g[-1]["end"], min(g_end, groups[gi + 1][0]["start"]))
         if not highlight:
             events.append(f"Dialogue: 0,{ass_ts(g[0]['start'])},{ass_ts(g_end)},Caption,,0,0,0,,"
                           + " ".join(ass_text(w["text"]) for w in g))
@@ -95,6 +98,19 @@ def caption_events(words: list[dict], style: str) -> list[str]:
                             for j, x in enumerate(g))
             events.append(f"Dialogue: 0,{ass_ts(w['start'])},{ass_ts(end)},Caption,,0,0,0,,{text}")
     return events
+
+
+def ass_header(font: str, w: int, h: int) -> list[str]:
+    return ["[Script Info]", "ScriptType: v4.00+", f"PlayResX: {w}", f"PlayResY: {h}", "WrapStyle: 0",
+            "ScaledBorderAndShadow: yes", "", "[V4+ Styles]", *_styles(font, w, h), "", "[Events]",
+            "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"]
+
+
+def build_scene_ass(font: str, w: int, h: int, words: list[dict], style: str | None,
+                    extra_events: list[str] | None = None) -> str:
+    """Workflow B: captions for one scene whose word timings are already scene-local (no time map)."""
+    events = caption_events([w for w in words if (w.get("text") or "").strip()], style) if style and words else []
+    return "\n".join(ass_header(font, w, h) + events + list(extra_events or [])) + "\n"
 
 
 def build_ass(font: str, w: int, h: int, tm: TimeMap, words: list[dict] | None, captions_op, overlays: list) -> tuple[str, int]:

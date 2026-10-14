@@ -23,12 +23,17 @@ CACHE_TTL_S = 24 * 3600
 def pollinations_url(prompt: str, width: int, height: int, seed: int | None = None, model: str = "flux") -> str:
     seed = seed if seed is not None else random.randint(0, 999_999)
     return (f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}"
-            f"?width={width}&height={height}&seed={seed}&nologo=true&model={model}")
+            f"?width={width}&height={height}&seed={seed}&nologo=true&safe=true&model={model}")
 
 
 def pollinations_generate(prompt: str, keys: dict, width: int = 1280, height: int = 720, seed: int | None = None) -> dict:
     url = pollinations_url(prompt, width, height, seed)
-    resp = http("GET", url, "Pollinations", timeout=180)
+    try:
+        resp = http("GET", url, "Pollinations", timeout=180)
+    except ProviderError as e:
+        if "402" in str(e) or e.kind == "rate_limited":  # anonymous tier answers 402 when requests come too fast
+            raise ProviderError("rate_limited", "Pollinations: बहुत जल्दी-जल्दी अनुरोध (402/429) — थोड़ी देर बाद।", 8.0)
+        raise
     if not resp.headers.get("content-type", "").startswith("image/"):
         raise ProviderError("bad_output", "Pollinations: image नहीं मिली।")
     return {"bytes": resp.content, "mime": resp.headers["content-type"], "source_url": url,
@@ -102,6 +107,51 @@ def pixabay_search(query: str, keys: dict, kind: str = "photo", per_page: int = 
     return out
 
 
+WIKI_UA = {"User-Agent": "AIYTStudio/2.0 (private non-commercial video tool; python-requests)"}
+_TAG = __import__("re").compile(r"<[^>]+>")
+
+
+def wikimedia_search(query: str, keys: dict, per_page: int = 6, min_width: int = 640) -> list[dict]:
+    """Free image search on Wikimedia Commons (no key). Results cached 24 h like stock; each item carries
+    author + licence for attribution (Commons requires it)."""
+    cache_key = f"photo|{query}|{per_page}"
+    cached = _cache_get("wikimedia", cache_key)
+    if cached is not None:
+        return cached
+    data = http("GET", "https://commons.wikimedia.org/w/api.php", "Wikimedia",
+                params={"action": "query", "format": "json", "formatversion": 2, "generator": "search",
+                        "gsrnamespace": 6, "gsrsearch": f"{query} filetype:bitmap", "gsrlimit": per_page * 2,
+                        "prop": "imageinfo", "iiprop": "url|mime|size|extmetadata", "iiurlwidth": 1280},
+                headers=WIKI_UA, timeout=30).json()
+    pages = sorted((data.get("query") or {}).get("pages") or [], key=lambda p: p.get("index", 0))
+    out = []
+    for p in pages:
+        info = (p.get("imageinfo") or [{}])[0]
+        if info.get("mime") not in ("image/jpeg", "image/png", "image/webp") or (info.get("width") or 0) < min_width:
+            continue
+        meta = info.get("extmetadata") or {}
+        artist = " ".join(_TAG.sub(" ", (meta.get("Artist") or {}).get("value", "")).split())[:120] or "unknown"
+        half = len(artist) // 2
+        if len(artist) % 2 == 0 and artist[:half] == artist[half:]:   # "Unknown authorUnknown author"
+            artist = artist[:half]
+        elif artist.count(" ") and artist[: (len(artist) - 1) // 2] == artist[(len(artist) + 1) // 2:]:
+            artist = artist[: (len(artist) - 1) // 2]
+        artist = artist[:80]
+        lic = (meta.get("LicenseShortName") or {}).get("value", "").strip()[:40] or "see source"
+        out.append({"kind": "photo", "url": info.get("thumburl") or info.get("url"), "width": info.get("thumbwidth"),
+                    "height": info.get("thumbheight"), "page": info.get("descriptionurl"),
+                    "attribution": f"{p.get('title', 'Image').removeprefix('File:')[:80]} — {artist}, {lic}, via Wikimedia Commons"})
+        if len(out) >= per_page:
+            break
+    _cache_put("wikimedia", cache_key, out)
+    return out
+
+
+def _wikimedia_health(keys):
+    http("GET", "https://commons.wikimedia.org/w/api.php", "Wikimedia",
+         params={"action": "query", "format": "json", "meta": "siteinfo"}, headers=WIKI_UA)
+
+
 def _pexels_health(keys):
     http("GET", "https://api.pexels.com/v1/search", "Pexels", params={"query": "test", "per_page": 1},
          headers={"Authorization": keys["apiKey"]})
@@ -114,14 +164,15 @@ def _pixabay_health(keys):
 PROVIDERS = [
     Provider("pollinations", "Pollinations.ai", "image", "free", [], "बिना key; शर्तें verify नहीं (2026-10)।",
              "https://pollinations.ai", priority=10, impl=pollinations_generate),
-    Provider("wikimedia", "Wikimedia Commons", "image", "free", [], "बिना key; attribution ज़रूरी।",
-             "https://commons.wikimedia.org", priority=20, enabled=False, note="वैकल्पिक — Phase 3 में।"),
+    Provider("wikimedia", "Wikimedia Commons (खोज)", "image", "free", [], "बिना key; हर तस्वीर का श्रेय (लेखक + लाइसेंस) दिखाया जाता है।",
+             "https://commons.wikimedia.org", priority=20, health_fn=_wikimedia_health, impl=wikimedia_search,
+             note="ऐतिहासिक लोग, जगहें, इमारतें — असली तस्वीरें।"),
     Provider("pexels", "Pexels", "stock", "free", [PEXELS_KEY], "Attribution ज़रूरी (2026-10)।",
              "https://www.pexels.com/api/", priority=10, health_fn=_pexels_health, impl=pexels_search),
     Provider("pixabay", "Pixabay", "stock", "free", [PIXABAY_KEY], "24 घंटे cache ज़रूरी, hotlinking मना (2026-10)।",
              "https://pixabay.com/api/docs/", priority=20, health_fn=_pixabay_health, impl=pixabay_search),
     Provider("avatar_2d", "2D cartoon avatar (built-in)", "avatar", "free", [], "स्थानीय रेंडर, बिना key।",
-             "", priority=10, note="Phase 3 में बनेगा।"),
+             "", priority=10, impl="app.create.avatar", note="3 किरदार (आरव, मीरा, दादाजी), आवाज़ से चलते होंठ, पलकें।"),
     Provider("lipsync_avatar", "Realistic lip-sync avatar", "avatar", "premium", [], "Price unverified.",
              "", priority=90, enabled=False, note="जल्द आ रहा है (MVP 2)।"),
 ]

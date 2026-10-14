@@ -75,7 +75,7 @@ export type Job = {
   error: string | null;
 };
 
-export type JobFull = Job & { result: any; project_id: string | null; finished_at: number | null };
+export type JobFull = Job & { result: any; project_id: string | null; finished_at: number | null; created_at?: number };
 
 export type Asset = {
   id: string;
@@ -106,6 +106,42 @@ export type EditState = {
   plan: PlanRow | null;
   jobs: { ingest: JobFull | null; transcribe: JobFull | null; render: JobFull | null };
   limits: { max_upload_mb: number; max_upload_seconds: number };
+};
+
+// --- Workflow B (topic → avatar video) ---------------------------------------------------------
+export type Opt = { id: string; label: string };
+export type Catalog = {
+  characters: { id: string; label: string; description: string; preview: string; outfits: (Opt & { color: number[] })[] }[];
+  backgrounds: (Opt & { preview: string })[];
+  languages: Opt[]; aspects: string[]; minutes: number[]; voices: Opt[]; rates: Opt[];
+  layouts: Opt[]; caption_styles: Opt[]; caption_scripts: Opt[]; checklist: string[];
+};
+export type Wizard = {
+  topic: string; notes: string; audience: string; tone: string; language: string; aspect: string; minutes: number;
+  character: string; outfit: string; background: string; voice: string; rate: string; layout: string;
+  caption_style: string; caption_script: string; music_asset_id: string | null; music_volume: number;
+};
+export type Fact = { id: string; text: string; source_url: string | null; uncertain: boolean };
+export type Visual = { kind: string; query: string; alt_queries: string[] };
+export type Scene = { id: string; text: string; layout: string; visual: Visual; fact_refs: string[]; est_seconds: number | null };
+export type Chapter = { chapter: number; title: string; scenes: Scene[] };
+export type Script = { title: string; chapters: Chapter[]; manual: boolean };
+export type PlatformMeta = { title: string; text: string; hashtags: string[] };
+export type Meta = {
+  titles: string[]; description: string; tags: string[]; platforms: Record<string, PlatformMeta>; source: string;
+  youtube_description: string; chapters: { t: number; title: string }[];
+};
+export type SceneState = {
+  duration: number | null; has_audio: boolean; layout: string | null;
+  visual: { url: string; attribution: string | null; provider: string | null; media: string | null } | null;
+};
+export type CreateJobs = Record<"research" | "script" | "generate" | "regenerate" | "pack", JobFull | null>;
+export type CreateState = {
+  project: { id: string; title: string; status: string; settings: Record<string, any> };
+  wizard: Wizard; facts: Fact[] | null; sources: { title: string; url: string; lang: string }[]; facts_provider: string | null;
+  outline: any; script: Script | null; script_complete: boolean; scenes: Record<string, SceneState>;
+  outputs: Asset[]; thumbnail: Asset | null; music: Asset[]; meta: Meta | null; notices: string[];
+  disclosure_ack_at: number | null; jobs: CreateJobs; checklist: string[];
 };
 
 /** Raw-body upload with progress (fetch has no upload progress). */
